@@ -19,10 +19,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, webpack }) => { // Added `webpack` from options
     if (!isServer) {
       // Exclude 'async_hooks' from client-side bundle
-      config.resolve.alias.async_hooks = false;
+      config.resolve.alias.async_hooks = false; // Keep the alias
+      
+      // Add IgnorePlugin for 'async_hooks'
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^async_hooks$/,
+        })
+      );
     }
     return config;
   },
