@@ -3,7 +3,7 @@
 
 import { Pie, PieChart, Tooltip, ResponsiveContainer, Cell } from "recharts"
 import type { User } from "@/lib/types"
-import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart"
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { useEffect, useState } from "react"
 
 
@@ -95,3 +95,4 @@ export function RolesDistributionChart({ users }: RolesDistributionChartProps) {
     </ChartContainer>
   )
 }
+
