@@ -1,0 +1,242 @@
+
+"use client";
+
+import type { Metadata } from 'next';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Contact, Send, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from 'react';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+
+// export const metadata: Metadata = { title: 'Contact Support' };
+// This won't work correctly with "use client" for the whole page for title.
+// Title should be set in a parent layout or via client-side document.title manipulation if dynamic.
+
+
+const contactFormSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters.").max(100),
+  email: z.string().email("Invalid email address."),
+  subject: z.string().min(5, "Subject must be at least 5 characters.").max(100),
+  inquiryType: z.string().min(1, "Please select an inquiry type."),
+  message: z.string().min(20, "Message must be at least 20 characters.").max(2000),
+  attachment: z.any().optional(), // Basic handling for potential file upload
+});
+
+type ContactFormValues = z.infer<typeof contactFormSchema>;
+
+
+export default function ContactSupportPage() {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null); // For attachment name
+  
+  useEffect(() => { // For dynamic title with "use client"
+    document.title = "Contact Support | User Hub";
+  }, []);
+
+  const form = useForm<ContactFormValues>({
+    resolver: zodResolver(contactFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      subject: "",
+      inquiryType: "",
+      message: "",
+    },
+  });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      // Basic validation (e.g., size, type) can be added here
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({ variant: "destructive", title: "File Too Large", description: "Attachment cannot exceed 5MB." });
+        event.target.value = ""; // Clear the input
+        setFileName(null);
+        form.setValue("attachment", null);
+        return;
+      }
+      setFileName(file.name);
+      form.setValue("attachment", file);
+    } else {
+      setFileName(null);
+      form.setValue("attachment", null);
+    }
+  };
+
+  async function onSubmit(values: ContactFormValues) {
+    setIsSubmitting(true);
+    // Simulate API call with FormData for file upload
+    const formData = new FormData();
+    Object.entries(values).forEach(([key, value]) => {
+      if (key === 'attachment' && value instanceof File) {
+        formData.append(key, value);
+      } else if (value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    });
+
+    // console.log("Contact form data to send:", formData); // For debugging
+    for (let pair of formData.entries()) {
+        console.log(pair[0]+ ', ' + pair[1]); 
+    }
+
+
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
+    
+    toast({
+      title: "Support Request Sent!",
+      description: "Thank you for contacting us. Our support team will get back to you soon.",
+    });
+    form.reset();
+    setFileName(null); // Reset file name display
+    setIsSubmitting(false);
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <Breadcrumbs
+        segments={[
+          { label: 'Help & Support', href: '#' },
+          { label: 'Contact Support' },
+        ]}
+      />
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center">
+            <Contact className="mr-3 h-7 w-7 text-primary" />
+            Contact Support
+          </CardTitle>
+          <CardDescription>
+            Need help or have a question? Fill out the form below, and we'll get back to you.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+           <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Your Name</FormLabel>
+                        <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Your Email</FormLabel>
+                        <FormControl>
+                        <Input type="email" placeholder="you@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="inquiryType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inquiry Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select reason for contact..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="technical_issue">Technical Issue</SelectItem>
+                        <SelectItem value="billing_question">Billing Question</SelectItem>
+                        <SelectItem value="feature_request">Feature Request</SelectItem>
+                        <SelectItem value="general_inquiry">General Inquiry</SelectItem>
+                        <SelectItem value="account_access">Account Access Problem</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="subject"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subject</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Brief summary of your inquiry" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="message"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Detailed Message</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Please describe your issue or question in detail..."
+                        className="min-h-[150px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="attachment"
+                render={({ field }) => ( // Destructure field but don't pass directly to Input type="file"
+                  <FormItem>
+                    <FormLabel>Attachment (Optional)</FormLabel>
+                    <FormControl>
+                       <Input type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold hover:file:bg-primary/10" />
+                    </FormControl>
+                    {fileName && <FormDescription>Selected file: {fileName}</FormDescription>}
+                     <FormDescription>Max file size: 5MB. Allowed types: PNG, JPG, PDF, TXT.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
+                 {isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                )}
+                Send Message
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
