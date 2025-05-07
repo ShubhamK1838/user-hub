@@ -27,3 +27,21 @@ export const ALL_ROLES = [
   "ROLE_SUPPORT",
   "ROLE_AUDITOR"
 ];
+
+export interface AuditLog {
+  id: string;
+  timestamp: string; // ISO date string
+  user: string; // email or 'system'
+  action: string; // e.g., LOGIN_SUCCESS, USER_UPDATE
+  details: string;
+  entity: string; // e.g., User, Role
+}
+
+export interface NotificationMessage {
+  id: string;
+  timestamp: string; // ISO date string
+  title: string;
+  message: string;
+  read: boolean;
+  type: 'security' | 'announcement' | 'system' | 'info'; // Example types
+}

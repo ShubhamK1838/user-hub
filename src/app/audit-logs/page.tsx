@@ -6,31 +6,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format, subDays, subHours } from 'date-fns';
+import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { getAuditLogs } from '@/lib/audit-logs';
+import type { AuditLog } from '@/lib/types';
 
 export const metadata: Metadata = {
   title: 'Audit Logs',
 };
 
-// Dummy audit log data
-const auditLogs = [
-  { id: 'log001', timestamp: subHours(new Date(), 2).toISOString(), user: 'john.doe@example.com', action: 'LOGIN_SUCCESS', details: 'IP: 192.168.1.100', entity: 'User' },
-  { id: 'log002', timestamp: subHours(new Date(), 1).toISOString(), user: 'admin@example.com', action: 'USER_UPDATE', details: 'Updated roles for user: alice.smith@example.com', entity: 'User' },
-  { id: 'log003', timestamp: subDays(new Date(), 1).toISOString(), user: 'alice.smith@example.com', action: 'PASSWORD_CHANGE', details: 'Password changed successfully', entity: 'User' },
-  { id: 'log004', timestamp: subDays(new Date(), 2).toISOString(), user: 'bob.johnson@example.com', action: 'LOGIN_FAILED', details: 'IP: 203.0.113.45, Reason: Invalid credentials', entity: 'User' },
-  { id: 'log005', timestamp: subDays(new Date(), 2).toISOString(), user: 'system', action: 'ROLE_CREATE', details: 'Created new role: ROLE_MARKETING', entity: 'Role' },
-];
-
 function getActionBadgeVariant(action: string): "default" | "secondary" | "destructive" | "outline" {
-    if (action.includes("CREATE") || action.includes("UPDATE") || action.includes("SUCCESS")) return "default";
+    if (action.includes("CREATE") || action.includes("SUCCESS") || action.includes("UPDATE")) return "default";
     if (action.includes("DELETE") || action.includes("FAILED")) return "destructive";
-    if (action.includes("LOGIN") || action.includes("LOGOUT")) return "secondary";
+    if (action.includes("LOGIN") || action.includes("LOGOUT") || action.includes("PROFILE")) return "secondary";
     return "outline";
 }
 
 
-export default function AuditLogsPage() {
+export default async function AuditLogsPage() {
+  // Fetch audit logs - assuming default page 1, limit 10 for now or fetch all
+  // For this example, we'll fetch a reasonable number like 20 for display without pagination yet.
+  // Or fetch all and let the component decide on pagination later if needed.
+  // The service itself currently returns all logs in dummyAuditLogs, so pagination params are for future use.
+  const { logs: auditLogs, total } = await getAuditLogs(1, 20); // Fetch first 20 logs or all if less
+
   return (
     <div className="space-y-6">
       <Breadcrumbs segments={[{ label: 'Audit Logs' }]} />
@@ -41,7 +40,7 @@ export default function AuditLogsPage() {
             Audit Logs
             </h1>
             <p className="text-muted-foreground">
-            Track important user actions and system events.
+            Track important user actions and system events. Showing {auditLogs.length} of {total} logs.
             </p>
         </div>
         <div className="flex gap-2">
@@ -67,7 +66,7 @@ export default function AuditLogsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {auditLogs.map((log) => (
+              {auditLogs.map((log: AuditLog) => (
                 <TableRow key={log.id}>
                   <TableCell className="text-xs whitespace-nowrap">
                     {format(new Date(log.timestamp), 'MMM d, yyyy, HH:mm:ss')}

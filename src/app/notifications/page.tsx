@@ -4,24 +4,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Bell, CheckCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { format, subDays, subHours } from 'date-fns';
+import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { getNotifications } from '@/lib/notifications';
+import type { NotificationMessage } from '@/lib/types';
 
 export const metadata: Metadata = {
   title: 'Notifications',
 };
 
-// Dummy notification data
-const notifications = [
-  { id: 'notif001', timestamp: subHours(new Date(), 1).toISOString(), title: 'Password Changed', message: 'Your password was successfully changed from a new device.', read: false, type: 'security' },
-  { id: 'notif002', timestamp: subDays(new Date(), 1).toISOString(), title: 'New Feature: AI Role Suggestion', message: 'Check out the new AI-powered role suggestion tool in Role Management.', read: false, type: 'announcement' },
-  { id: 'notif003', timestamp: subDays(new Date(), 2).toISOString(), title: 'Maintenance Scheduled', message: 'Scheduled maintenance on Sunday at 2 AM UTC. Expect brief downtime.', read: true, type: 'system' },
-  { id: 'notif004', timestamp: subDays(new Date(), 3).toISOString(), title: 'Your export is ready', message: 'The user data export you requested is complete and available for download.', read: true, type: 'info' },
-];
 
-
-export default function NotificationsPage() {
-  const unreadCount = notifications.filter(n => !n.read).length;
+export default async function NotificationsPage() {
+  const { notifications, unreadCount } = await getNotifications();
 
   return (
     <div className="space-y-6">
@@ -33,7 +27,7 @@ export default function NotificationsPage() {
                 Notifications
             </h1>
             <p className="text-muted-foreground">
-                {unreadCount > 0 ? `You have ${unreadCount} unread notifications.` : 'No new notifications.'}
+                {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}.` : 'No new notifications.'}
             </p>
         </div>
         <div className="flex gap-2">
@@ -50,7 +44,7 @@ export default function NotificationsPage() {
         <CardContent>
           {notifications.length > 0 ? (
             <ul className="space-y-4">
-              {notifications.map((notification) => (
+              {notifications.map((notification: NotificationMessage) => (
                 <li key={notification.id} className={`p-4 rounded-lg border ${notification.read ? 'bg-card' : 'bg-primary/5 border-primary/20'}`}>
                   <div className="flex justify-between items-start">
                     <div>
