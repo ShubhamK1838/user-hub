@@ -1,177 +1,541 @@
 
-# User Hub API Documentation
+# User Hub Backend API Documentation
 
 ## 1. Introduction
 
-The User Hub application primarily utilizes Next.js Server Components and Server Actions. This means that instead of traditional REST or GraphQL API endpoints, data fetching and mutations are handled by:
+This document outlines the backend API endpoints required for the User Hub application. These endpoints are designed to be consumed by the Next.js frontend, replacing direct server actions and data fetching where a separate backend is implemented.
 
-*   **Server Components**: These components fetch data directly on the server using asynchronous functions.
-*   **Server Actions**: These are functions executed on the server, callable from client components, typically for form submissions and data mutations.
-*   **Genkit Flows**: AI-powered functionalities are exposed as server-side flows, which are also invoked as Server Actions.
+All API responses should be in JSON format unless otherwise specified. Standard HTTP status codes should be used to indicate the outcome of requests.
 
-This document outlines the key server-side functions that form the application's "API" layer.
+## 2. Authentication
 
-## 2. AI Services (Genkit Flows)
+Most API endpoints require authentication. Authenticated requests should include a Bearer token in the `Authorization` header:
 
-These services leverage Genkit for AI-powered features.
+`Authorization: Bearer <YOUR_JWT_TOKEN>`
 
-### 2.1 Suggest User Roles
+Endpoints that do not require authentication are typically public (e.g., login, register, forgot password).
 
-*   **Purpose**: Suggests user roles based on a given job title.
-*   **Method**: Server Action (Genkit Flow)
-*   **File Path**: `src/ai/flows/suggest-user-roles.ts`
-*   **Function**: `async function suggestUserRoles(input: SuggestUserRolesInput): Promise<SuggestUserRolesOutput>`
-*   **Input Schema (`SuggestUserRolesInput`)**:
-    ```typescript
+## 3. API Endpoints
+
+### 3.1 Authentication API
+
+Endpoints related to user authentication and session management.
+
+#### 3.1.1 Login User
+
+*   **Endpoint**: `POST /api/auth/login`
+*   **Description**: Authenticates a user and returns a session token and user details.
+*   **Request Body**:
+    ```json
     {
-      jobTitle: string; // The job title of the user.
+      "email": "string (email format)",
+      "password": "string",
+      "rememberMe": "boolean (optional)"
     }
     ```
-*   **Output Schema (`SuggestUserRolesOutput`)**:
-    ```typescript
+*   **Response Body (Success - 200 OK)**:
+    ```json
     {
-      suggestedRoles: string[]; // An array of suggested roles.
+      "token": "string (JWT)",
+      "user": "User" // See User Object Structure
     }
     ```
-*   **Example Invocation (Client Component)**:
-    ```typescript
-    import { suggestUserRoles } from '@/ai/flows/suggest-user-roles';
-
-    async function handleSuggest(jobTitle: string) {
-      const result = await suggestUserRoles({ jobTitle });
-      // Process result.suggestedRoles
+*   **Response Body (Error - 400 Bad Request, 401 Unauthorized)**:
+    ```json
+    {
+      "message": "string (error description)"
     }
     ```
 
-## 3. User Management API
+#### 3.1.2 Register User
 
-Functions related to managing user data. These are typically used by Server Components for reads or invoked as Server Actions for mutations.
+*   **Endpoint**: `POST /api/auth/register`
+*   **Description**: Registers a new user.
+*   **Request Body**:
+    ```json
+    {
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string (email format)",
+      "password": "string (min 8 characters)"
+    }
+    ```
+*   **Response Body (Success - 201 Created)**:
+    ```json
+    {
+      "user": "User" // See User Object Structure, default roles assigned by backend
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request, 409 Conflict)**:
+    ```json
+    {
+      "message": "string (error description)"
+    }
+    ```
 
-### 3.1 Get Users
+#### 3.1.3 Forgot Password
 
-*   **Purpose**: Fetches a paginated and optionally filtered list of users.
-*   **Method**: Server Component Data Fetch
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function getUsers(page: number = 1, limit: number = 10, searchTerm?: string, roleFilter?: string): Promise<{ users: User[]; total: number }>`
-*   **Parameters**:
-    *   `page` (optional, number): The page number for pagination (default: 1).
-    *   `limit` (optional, number): The number of users per page (default: 10).
-    *   `searchTerm` (optional, string): A term to search by (name, email, role).
-    *   `roleFilter` (optional, string): A specific role to filter users by.
-*   **Returns**: An object containing an array of `User` objects and the `total` count of users matching the criteria.
-*   **User Object Structure**: See `src/lib/types.ts` for the `User` interface.
+*   **Endpoint**: `POST /api/auth/forgot-password`
+*   **Description**: Initiates the password reset process by sending an email to the user.
+*   **Request Body**:
+    ```json
+    {
+      "email": "string (email format)"
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "message": "If an account exists for this email, a password reset link has been sent."
+    }
+    ```
+    *(Note: Always return a generic success message for security reasons, regardless of whether the email exists.)*
 
-### 3.2 Get User By ID
+#### 3.1.4 Reset Password
 
-*   **Purpose**: Fetches a single user by their unique ID.
-*   **Method**: Server Component Data Fetch
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function getUserById(id: string): Promise<User | undefined>`
-*   **Parameters**:
+*   **Endpoint**: `POST /api/auth/reset-password`
+*   **Description**: Resets the user's password using a token received via email.
+*   **Request Body**:
+    ```json
+    {
+      "token": "string (password reset token)",
+      "newPassword": "string (min 8 characters)"
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "message": "Password has been reset successfully."
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request)**:
+    ```json
+    {
+      "message": "Invalid or expired token, or invalid password."
+    }
+    ```
+
+#### 3.1.5 Get Current User (Authenticated)
+
+*   **Endpoint**: `GET /api/auth/me`
+*   **Description**: Fetches data for the currently authenticated user.
+*   **Authentication**: Required.
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "user": "User" // See User Object Structure
+    }
+    ```
+*   **Response Body (Error - 401 Unauthorized)**: If no valid token is provided.
+
+#### 3.1.6 Change Password (Authenticated User)
+
+*   **Endpoint**: `POST /api/auth/change-password`
+*   **Description**: Allows the authenticated user to change their own password.
+*   **Authentication**: Required.
+*   **Request Body**:
+    ```json
+    {
+      "currentPassword": "string",
+      "newPassword": "string (min 8 characters)"
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "success": true,
+      "message": "Password changed successfully."
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request, 401 Unauthorized)**:
+    ```json
+    {
+      "success": false,
+      "message": "string (error description, e.g., Incorrect current password)"
+    }
+    ```
+
+### 3.2 User Management API
+
+Endpoints for managing user accounts. Typically require admin privileges.
+
+#### 3.2.1 Get Users List
+
+*   **Endpoint**: `GET /api/users`
+*   **Description**: Fetches a paginated and optionally filtered list of users.
+*   **Authentication**: Required (Admin).
+*   **Query Parameters**:
+    *   `page` (optional, number): Page number (default: 1).
+    *   `limit` (optional, number): Users per page (default: 10).
+    *   `search` (optional, string): Search term (name, email, role).
+    *   `role` (optional, string): Role to filter by (e.g., "ROLE_ADMIN").
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "users": ["User"], // Array of User objects, see User Object Structure
+      "total": "number (total matching users)",
+      "currentPage": "number",
+      "totalPages": "number"
+    }
+    ```
+
+#### 3.2.2 Get User By ID
+
+*   **Endpoint**: `GET /api/users/{id}`
+*   **Description**: Fetches a single user by their unique ID.
+*   **Authentication**: Required (Admin or self).
+*   **Path Parameters**:
     *   `id` (string): The unique identifier of the user.
-*   **Returns**: A `User` object if found, otherwise `undefined`.
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "user": "User" // See User Object Structure
+    }
+    ```
+*   **Response Body (Error - 404 Not Found)**: If user with ID does not exist.
 
-### 3.3 Create User
+#### 3.2.3 Create User
 
-*   **Purpose**: Creates a new user.
-*   **Method**: Server Action
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function createUser(userData: Omit<User, 'id' | 'createdDate' | 'updatedDate'>): Promise<User>`
-*   **Parameters**:
-    *   `userData`: An object containing user details (excluding `id`, `createdDate`, `updatedDate`).
-*   **Returns**: The newly created `User` object.
+*   **Endpoint**: `POST /api/users`
+*   **Description**: Creates a new user.
+*   **Authentication**: Required (Admin).
+*   **Request Body**: `Omit<User, 'id' | 'createdDate' | 'updatedDate' | 'lastLoginDate'>` (Password is required for new user creation)
+    ```json
+    {
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string (email format)",
+      "password": "string (min 8 characters)",
+      "roles": "string (comma-separated, e.g., 'ROLE_USER,ROLE_EDITOR')",
+      "jobTitle": "string (optional)",
+      "accountNonExpired": "boolean (default: true)",
+      "accountNonLocked": "boolean (default: true)",
+      "credentialsNonExpired": "boolean (default: true)",
+      "enabled": "boolean (default: true)"
+    }
+    ```
+*   **Response Body (Success - 201 Created)**:
+    ```json
+    {
+      "user": "User" // The newly created User object, see User Object Structure
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request)**: For validation errors.
 
-### 3.4 Update User
+#### 3.2.4 Update User
 
-*   **Purpose**: Updates an existing user's information.
-*   **Method**: Server Action
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function updateUser(id: string, updates: Partial<Omit<User, 'id' | 'createdDate' | 'password'>>): Promise<User | undefined>`
-*   **Parameters**:
+*   **Endpoint**: `PUT /api/users/{id}`
+*   **Description**: Updates an existing user's information. Password updates should ideally be handled by the `change-password` endpoint or a dedicated admin password reset flow.
+*   **Authentication**: Required (Admin or self, with restrictions for self-update).
+*   **Path Parameters**:
     *   `id` (string): The ID of the user to update.
-    *   `updates`: An object containing the fields to update.
-*   **Returns**: The updated `User` object if successful, otherwise `undefined`.
+*   **Request Body**: `Partial<Omit<User, 'id' | 'createdDate' | 'updatedDate' | 'lastLoginDate' | 'password'>>`
+    ```json
+    {
+      "firstName": "string (optional)",
+      "lastName": "string (optional)",
+      "email": "string (email format, optional)",
+      "roles": "string (comma-separated, optional, admin only)",
+      "jobTitle": "string (optional)",
+      // Admin-only updatable fields:
+      "accountNonExpired": "boolean (optional, admin only)",
+      "accountNonLocked": "boolean (optional, admin only)",
+      "credentialsNonExpired": "boolean (optional, admin only)",
+      "enabled": "boolean (optional, admin only)"
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "user": "User" // The updated User object, see User Object Structure
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request, 404 Not Found)**.
 
-### 3.5 Delete User
+#### 3.2.5 Delete User
 
-*   **Purpose**: Deletes a user from the system.
-*   **Method**: Server Action
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function deleteUser(id: string): Promise<boolean>`
-*   **Parameters**:
+*   **Endpoint**: `DELETE /api/users/{id}`
+*   **Description**: Deletes a user from the system.
+*   **Authentication**: Required (Admin).
+*   **Path Parameters**:
     *   `id` (string): The ID of the user to delete.
-*   **Returns**: `true` if deletion was successful, `false` otherwise.
+*   **Response Body (Success - 204 No Content)** or (200 OK with body):
+    ```json
+    {
+      "success": true,
+      "message": "User deleted successfully."
+    }
+    ```
+*   **Response Body (Error - 404 Not Found)**.
 
-### 3.6 Get Current User
+#### 3.2.6 Get Unique Roles
 
-*   **Purpose**: Fetches data for the "currently logged-in" user (mocked).
-*   **Method**: Server Component Data Fetch / Server Action
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function getCurrentUser(): Promise<User | undefined>`
-*   **Returns**: The `User` object for the current user, or `undefined` if not found/logged in.
+*   **Endpoint**: `GET /api/roles/unique`
+*   **Description**: Retrieves a list of all unique roles present in the system.
+*   **Authentication**: Required.
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "roles": ["string"] // Array of unique role strings
+    }
+    ```
 
-### 3.7 Get Unique Roles
+### 3.3 AI Services API
 
-*   **Purpose**: Retrieves a list of all unique roles assigned to users in the system.
-*   **Method**: Server Component Data Fetch
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function getUniqueRoles(): Promise<string[]>`
-*   **Returns**: An array of unique role strings.
+Endpoints utilizing Genkit for AI-powered features.
 
-### 3.8 Change Password
+#### 3.3.1 Suggest User Roles
 
-*   **Purpose**: Allows a user to change their password.
-*   **Method**: Server Action
-*   **File Path**: `src/lib/users.ts`
-*   **Function**: `async function changePassword(userId: string, currentPassword?: string, newPassword?: string): Promise<{success: boolean, message: string}>`
-*   **Parameters**:
-    *   `userId` (string): The ID of the user changing their password.
-    *   `currentPassword` (optional, string): The user's current password (for verification).
-    *   `newPassword` (optional, string): The new password.
-*   **Returns**: An object indicating success status and a message.
+*   **Endpoint**: `POST /api/ai/suggest-roles`
+*   **Description**: Suggests user roles based on a given job title.
+*   **Authentication**: Required.
+*   **Request Body**:
+    ```json
+    {
+      "jobTitle": "string" // The job title of the user.
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "suggestedRoles": ["string"] // An array of suggested role strings.
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request, 500 Internal Server Error)**.
 
-## 4. Audit Log API
+### 3.4 Audit Log API
 
-Functions related to accessing audit log data.
+Endpoints for accessing audit log data.
 
-### 4.1 Get Audit Logs
+#### 3.4.1 Get Audit Logs
 
-*   **Purpose**: Fetches a paginated list of audit logs.
-*   **Method**: Server Component Data Fetch
-*   **File Path**: `src/lib/audit-logs.ts`
-*   **Function**: `async function getAuditLogs(page: number = 1, limit: number = 10): Promise<{ logs: AuditLog[]; total: number }>`
-*   **Parameters**:
-    *   `page` (optional, number): Page number for pagination (default: 1).
-    *   `limit` (optional, number): Number of logs per page (default: 10).
-*   **Returns**: An object containing an array of `AuditLog` objects and the `total` count.
-*   **AuditLog Object Structure**: See `src/lib/types.ts` for the `AuditLog` interface.
+*   **Endpoint**: `GET /api/audit-logs`
+*   **Description**: Fetches a paginated list of audit logs.
+*   **Authentication**: Required (Admin).
+*   **Query Parameters**:
+    *   `page` (optional, number): Page number (default: 1).
+    *   `limit` (optional, number): Logs per page (default: 10).
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "logs": ["AuditLog"], // Array of AuditLog objects, see AuditLog Object Structure
+      "total": "number (total logs)",
+      "currentPage": "number",
+      "totalPages": "number"
+    }
+    ```
 
-## 5. Notification API
+### 3.5 Notification API
 
-Functions related to accessing notification data.
+Endpoints for accessing and managing user notifications.
 
-### 5.1 Get Notifications
+#### 3.5.1 Get Notifications
 
-*   **Purpose**: Fetches notifications for the current user.
-*   **Method**: Server Component Data Fetch
-*   **File Path**: `src/lib/notifications.ts`
-*   **Function**: `async function getNotifications(): Promise<{ notifications: NotificationMessage[]; total: number, unreadCount: number }>`
-*   **Returns**: An object containing an array of `NotificationMessage` objects, the `total` count, and the `unreadCount`.
-*   **NotificationMessage Object Structure**: See `src/lib/types.ts` for the `NotificationMessage` interface.
+*   **Endpoint**: `GET /api/notifications`
+*   **Description**: Fetches notifications for the currently authenticated user.
+*   **Authentication**: Required.
+*   **Query Parameters (Optional)**:
+    *   `page` (optional, number): Page number for pagination.
+    *   `limit` (optional, number): Notifications per page.
+    *   `status` (optional, string): "unread" or "all".
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "notifications": ["NotificationMessage"], // See NotificationMessage Object Structure
+      "total": "number (total notifications matching filter)",
+      "unreadCount": "number (total unread notifications for the user)"
+    }
+    ```
 
-## 6. Simulated Form Submissions (Client-Side Actions)
+#### 3.5.2 Mark Notification as Read
 
-Certain pages like "Contact Support" (`src/app/contact-support/page.tsx`) and "Feedback" (`src/app/feedback/page.tsx`) use client-side form handling that simulates a submission to a backend. Currently, these do not call dedicated API functions in `src/lib` or `src/ai` but handle the logic (like showing a toast message) directly within the client component.
+*   **Endpoint**: `PATCH /api/notifications/{notificationId}/read`
+*   **Description**: Marks a specific notification as read for the current user.
+*   **Authentication**: Required.
+*   **Path Parameters**:
+    *   `notificationId` (string): The ID of the notification.
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "notification": "NotificationMessage" // The updated NotificationMessage object
+    }
+    ```
+*   **Response Body (Error - 404 Not Found)**.
 
-*   **Contact Support Form**:
-    *   **File Path**: `src/app/contact-support/page.tsx`
-    *   **Action**: `onSubmit` function within the component.
-    *   **Simulates**: Sending a support request with name, email, subject, inquiry type, message, and an optional attachment.
-*   **Feedback Form**:
-    *   **File Path**: `src/app/feedback/page.tsx`
-    *   **Action**: `onSubmit` function within the component.
-    *   **Simulates**: Submitting feedback with type, optional email, subject, and message.
+#### 3.5.3 Mark All Notifications as Read
+
+*   **Endpoint**: `POST /api/notifications/mark-all-read`
+*   **Description**: Marks all unread notifications for the current user as read.
+*   **Authentication**: Required.
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "success": true,
+      "message": "All notifications marked as read.",
+      "unreadCountAfter": 0
+    }
+    ```
+
+#### 3.5.4 Clear All Notifications
+
+*   **Endpoint**: `DELETE /api/notifications` (or `POST /api/notifications/clear-all`)
+*   **Description**: Deletes all notifications for the current user.
+*   **Authentication**: Required.
+*   **Response Body (Success - 204 No Content)** or (200 OK with body):
+    ```json
+    {
+      "success": true,
+      "message": "All notifications cleared."
+    }
+    ```
+
+### 3.6 Settings API
+
+Endpoints for managing user-specific settings.
+
+#### 3.6.1 Update Notification Preferences
+
+*   **Endpoint**: `PUT /api/settings/notifications`
+*   **Description**: Updates the current user's notification preferences.
+*   **Authentication**: Required.
+*   **Request Body**:
+    ```json
+    {
+      "systemAlerts": "boolean",
+      "newLogins": "boolean",
+      "passwordChanges": "boolean",
+      "roleUpdates": "boolean"
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "preferences": { /* same structure as request body */ },
+      "message": "Notification preferences updated successfully."
+    }
+    ```
+
+#### 3.6.2 Update Language Preference
+
+*   **Endpoint**: `PUT /api/settings/language`
+*   **Description**: Updates the current user's language preference.
+*   **Authentication**: Required.
+*   **Request Body**:
+    ```json
+    {
+      "language": "string" // e.g., "en", "es"
+    }
+    ```
+*   **Response Body (Success - 200 OK)**:
+    ```json
+    {
+      "language": "string",
+      "message": "Language preference updated successfully."
+    }
+    ```
+
+### 3.7 Support & Feedback API
+
+Endpoints for handling user support requests and feedback.
+
+#### 3.7.1 Submit Contact Support Request
+
+*   **Endpoint**: `POST /api/support/contact`
+*   **Description**: Submits a contact support request.
+*   **Request Body (Content-Type: multipart/form-data if attachment is included, otherwise application/json)**:
+    ```json
+    {
+      "name": "string",
+      "email": "string (email format)",
+      "subject": "string",
+      "inquiryType": "string (e.g., 'technical_issue', 'billing_question')",
+      "message": "string",
+      "attachment": "file (optional)"
+    }
+    ```
+*   **Response Body (Success - 201 Created)**:
+    ```json
+    {
+      "success": true,
+      "message": "Support request received. We will get back to you shortly.",
+      "ticketId": "string (optional, if a ticketing system is used)"
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request)**.
+
+#### 3.7.2 Submit Feedback
+
+*   **Endpoint**: `POST /api/feedback`
+*   **Description**: Submits user feedback.
+*   **Request Body**:
+    ```json
+    {
+      "feedbackType": "string (e.g., 'suggestion', 'bug_report')",
+      "email": "string (email format, optional)",
+      "subject": "string",
+      "message": "string"
+    }
+    ```
+*   **Response Body (Success - 201 Created)**:
+    ```json
+    {
+      "success": true,
+      "message": "Thank you for your feedback!"
+    }
+    ```
+*   **Response Body (Error - 400 Bad Request)**.
+
+## 4. Object Structures
+
+Common data object structures referenced in API responses.
+
+### 4.1 User Object
+
+```typescript
+{
+  "id": "string (unique identifier)",
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string (email format)",
+  // "password" field is never returned in API responses
+  "roles": "string (comma-separated list of roles, e.g., 'ROLE_USER,ROLE_ADMIN')",
+  "jobTitle": "string (optional)",
+  "createdDate": "string (ISO 8601 datetime)",
+  "updatedDate": "string (ISO 8601 datetime)",
+  "lastLoginDate": "string (ISO 8601 datetime, optional, null if never logged in)",
+  "accountNonExpired": "boolean",
+  "accountNonLocked": "boolean",
+  "credentialsNonExpired": "boolean",
+  "enabled": "boolean (user account is active/disabled)"
+}
+```
+
+### 4.2 AuditLog Object
+
+```typescript
+{
+  "id": "string (unique identifier)",
+  "timestamp": "string (ISO 8601 datetime)",
+  "user": "string (user email or 'system')",
+  "action": "string (e.g., 'LOGIN_SUCCESS', 'USER_UPDATE')",
+  "details": "string (description of the action)",
+  "entity": "string (e.g., 'User', 'Role', 'System')"
+}
+```
+
+### 4.3 NotificationMessage Object
+
+```typescript
+{
+  "id": "string (unique identifier)",
+  "timestamp": "string (ISO 8601 datetime)",
+  "title": "string",
+  "message": "string",
+  "read": "boolean",
+  "type": "string (e.g., 'security', 'announcement', 'system', 'info')"
+}
+```
 
 ---
 
-*This documentation reflects the current state of the application. As features evolve, this document should be updated.*
+*This documentation should be updated as the backend API evolves. Ensure schemas are kept in sync with actual implementations.*
