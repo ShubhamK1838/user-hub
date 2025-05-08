@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Mail, Send, Loader2 } from 'lucide-react';
+import { Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { AppLogoText } from '@/components/icons/logo';
 import { useToast } from '@/hooks/use-toast';
@@ -12,8 +12,8 @@ import { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { useRouter } from 'next/navigation';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { forgotPasswordApi } from '@/lib/api-client';
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email address."),
@@ -23,7 +23,6 @@ type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordPage() {
   const { toast } = useToast();
-  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -39,16 +38,22 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(values: ForgotPasswordFormValues) {
     setIsSubmitting(true);
-    console.log("Password reset request for:", values.email);
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
-
-    toast({
-      title: "Password Reset Email Sent",
-      description: `If an account exists for ${values.email}, you will receive an email with instructions to reset your password.`,
-    });
-    // Don't actually redirect or confirm if email exists for security reasons
-    // form.reset(); // Optionally reset form
-    setIsSubmitting(false);
+    try {
+      const response = await forgotPasswordApi(values);
+      toast({
+        title: "Password Reset Email Sent",
+        description: response.message || `If an account exists for ${values.email}, you will receive an email with instructions to reset your password.`,
+      });
+      form.reset();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Request Failed",
+        description: error.message || "Could not process password reset request. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (

@@ -1,21 +1,81 @@
 
-import type { Metadata } from 'next';
+"use client";
+
+import { useEffect, useState, useTransition } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bell, CheckCheck, Trash2 } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
-import { getNotifications } from '@/lib/notifications';
+import { getNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from '@/lib/notifications';
 import type { NotificationMessage } from '@/lib/types';
-
-export const metadata: Metadata = {
-  title: 'Notifications',
-};
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 
-export default async function NotificationsPage() {
-  const { notifications, unreadCount } = await getNotifications();
+export default function NotificationsPage() {
+  const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getNotifications(); // Assuming default params for now
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load notifications.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    document.title = "Notifications | User Hub";
+    fetchNotifications();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleMarkAsRead = async (id: string) => {
+    startTransition(async () => {
+      const result = await markNotificationAsRead(id);
+      if (result) {
+        toast({ title: 'Success', description: 'Notification marked as read.' });
+        fetchNotifications(); // Refresh list
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to mark notification as read.' });
+      }
+    });
+  };
+
+  const handleMarkAllRead = async () => {
+    startTransition(async () => {
+      const result = await markAllNotificationsAsRead();
+      if (result?.success) {
+        toast({ title: 'Success', description: result.message });
+        fetchNotifications();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result?.message || 'Failed to mark all as read.' });
+      }
+    });
+  };
+
+  const handleClearAll = async () => {
+     startTransition(async () => {
+      const result = await clearAllNotifications();
+      if (result?.success) {
+        toast({ title: 'Success', description: result.message });
+        fetchNotifications();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result?.message || 'Failed to clear notifications.' });
+      }
+    });
+  };
+
 
   return (
     <div className="space-y-6">
@@ -31,8 +91,14 @@ export default async function NotificationsPage() {
             </p>
         </div>
         <div className="flex gap-2">
-            <Button variant="outline" disabled><CheckCheck className="mr-2 h-4 w-4" />Mark All as Read (Coming Soon)</Button>
-            <Button variant="destructive" disabled><Trash2 className="mr-2 h-4 w-4" />Clear All (Coming Soon)</Button>
+            <Button variant="outline" onClick={handleMarkAllRead} disabled={isPending || unreadCount === 0}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <CheckCheck className="mr-2 h-4 w-4" />Mark All as Read
+            </Button>
+            <Button variant="destructive" onClick={handleClearAll} disabled={isPending || notifications.length === 0}>
+                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Trash2 className="mr-2 h-4 w-4" />Clear All
+            </Button>
         </div>
       </div>
       
@@ -42,7 +108,11 @@ export default async function NotificationsPage() {
           <CardDescription>Stay updated with important events and alerts.</CardDescription>
         </CardHeader>
         <CardContent>
-          {notifications.length > 0 ? (
+          {isLoading ? (
+             <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          ) : notifications.length > 0 ? (
             <ul className="space-y-4">
               {notifications.map((notification: NotificationMessage) => (
                 <li key={notification.id} className={`p-4 rounded-lg border ${notification.read ? 'bg-card' : 'bg-primary/5 border-primary/20'}`}>
@@ -56,7 +126,10 @@ export default async function NotificationsPage() {
                     </span>
                   </div>
                   {!notification.read && (
-                    <Button size="sm" variant="link" className="p-0 h-auto mt-2 text-primary" disabled>Mark as read</Button>
+                    <Button size="sm" variant="link" className="p-0 h-auto mt-2 text-primary" onClick={() => handleMarkAsRead(notification.id)} disabled={isPending}>
+                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Mark as read
+                    </Button>
                   )}
                 </li>
               ))}
@@ -66,9 +139,6 @@ export default async function NotificationsPage() {
           )}
         </CardContent>
       </Card>
-       <p className="text-center text-sm text-muted-foreground">
-        This is a simplified notification system. Full implementation would include real-time updates and user-specific notifications.
-      </p>
     </div>
   );
 }

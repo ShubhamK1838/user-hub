@@ -10,12 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { suggestUserRoles } from "@/ai/flows/suggest-user-roles";
+import { suggestUserRolesApi } from "@/lib/api-client"; // Use API client
 import { BrainCircuit, Loader2, Sparkles } from "lucide-react";
 import { ALL_ROLES } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
-import { Separator } from "@/components/ui/separator";
 
 const suggestRolesSchema = z.object({
   jobTitle: z.string().min(3, "Job title must be at least 3 characters.").max(100),
@@ -39,11 +38,9 @@ export default function SuggestRolesPage() {
     setIsLoading(true);
     setSuggestedRoles([]);
     try {
-      const result = await suggestUserRoles({ jobTitle: values.jobTitle });
+      const result = await suggestUserRolesApi({ jobTitle: values.jobTitle });
       if (result.suggestedRoles && result.suggestedRoles.length > 0) {
-        // Filter suggestions to include only known roles for safety or allow new ones
-        const validSuggestions = result.suggestedRoles; // For now, allow any string from AI
-        setSuggestedRoles(validSuggestions);
+        setSuggestedRoles(result.suggestedRoles);
         toast({
           title: "Roles Suggested",
           description: `AI has suggested roles for "${values.jobTitle}".`,
@@ -55,12 +52,11 @@ export default function SuggestRolesPage() {
           description: `AI could not find suitable role suggestions for "${values.jobTitle}".`,
         });
       }
-    } catch (error) {
-      console.error("Error suggesting roles:", error);
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Suggestion Failed",
-        description: "An error occurred while trying to get role suggestions.",
+        description: error.message || "An error occurred while trying to get role suggestions.",
       });
     } finally {
       setIsLoading(false);
@@ -137,4 +133,3 @@ export default function SuggestRolesPage() {
     </div>
   );
 }
-

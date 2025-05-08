@@ -14,13 +14,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import type { User } from "@/lib/types";
-import { CreditCard, LogOut, PlusCircle, Settings, User as UserIcon } from "lucide-react";
+import { LogOut, Settings, User as UserIcon } from "lucide-react";
+import { clearAuthToken } from "@/lib/auth-token";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 interface UserNavProps {
   user?: User | null;
 }
 
 export function UserNav({ user }: UserNavProps) {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleLogout = () => {
+    clearAuthToken();
+    toast({
+      title: "Logged Out",
+      description: "You have been successfully logged out.",
+    });
+    router.push("/login");
+    router.refresh(); // Ensures AppShell and other components re-evaluate auth state
+  };
+
+
   if (!user) {
     return (
       <Button asChild variant="outline">
@@ -68,7 +85,7 @@ export function UserNav({ user }: UserNavProps) {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled> {/* Replace with actual logout logic */}
+        <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>

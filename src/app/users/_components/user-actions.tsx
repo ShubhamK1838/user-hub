@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit, Eye, MoreHorizontal, Trash2 } from "lucide-react";
+import { Edit, Eye, MoreHorizontal, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
   AlertDialog,
@@ -22,9 +22,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { deleteUser } from "@/lib/users";
+import { deleteUser } from "@/lib/users"; // This will now use API client
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 interface UserActionsProps {
   userId: string;
@@ -33,18 +34,22 @@ interface UserActionsProps {
 export function UserActions({ userId }: UserActionsProps) {
   const { toast } = useToast();
   const router = useRouter();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
+    setIsDeleting(true);
     try {
       const success = await deleteUser(userId);
       if (success) {
         toast({ title: "Success", description: "User deleted successfully." });
-        router.refresh(); // Refresh the page to update the user list
+        router.refresh(); 
       } else {
-        toast({ variant: "destructive", title: "Error", description: "Failed to delete user." });
+        toast({ variant: "destructive", title: "Error", description: "Failed to delete user. The user might not exist or an API error occurred." });
       }
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -52,9 +57,9 @@ export function UserActions({ userId }: UserActionsProps) {
     <AlertDialog>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
+          <Button variant="ghost" className="h-8 w-8 p-0" disabled={isDeleting}>
             <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
+            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -89,7 +94,8 @@ export function UserActions({ userId }: UserActionsProps) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+          <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground" disabled={isDeleting}>
+            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

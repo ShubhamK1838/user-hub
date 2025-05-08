@@ -1,30 +1,59 @@
 
 import type { NotificationMessage } from './types';
-import { subDays, subHours, formatISO } from 'date-fns';
-
-// Dummy notification data
-const dummyNotifications: NotificationMessage[] = [
-  { id: 'notif001', timestamp: subHours(new Date(), 1).toISOString(), title: 'Password Changed', message: 'Your password was successfully changed from a new device.', read: false, type: 'security' },
-  { id: 'notif002', timestamp: subDays(new Date(), 1).toISOString(), title: 'New Feature: AI Role Suggestion', message: 'Check out the new AI-powered role suggestion tool in Role Management.', read: false, type: 'announcement' },
-  { id: 'notif003', timestamp: subDays(new Date(), 2).toISOString(), title: 'Maintenance Scheduled', message: 'Scheduled maintenance on Sunday at 2 AM UTC. Expect brief downtime.', read: true, type: 'system' },
-  { id: 'notif004', timestamp: subDays(new Date(), 3).toISOString(), title: 'Your export is ready', message: 'The user data export you requested is complete and available for download.', read: true, type: 'info' },
-  { id: 'notif005', timestamp: subHours(new Date(), 6).toISOString(), title: 'New Login Alert', message: 'A new login to your account was detected from an unrecognized device in London, UK.', read: false, type: 'security'},
-  { id: 'notif006', timestamp: subDays(new Date(), 4).toISOString(), title: 'User Role Updated', message: 'Your role has been updated to ROLE_MANAGER by admin@example.com.', read: true, type: 'info' },
-];
-
-// Simulate a delay for API calls
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { 
+  getNotificationsApi,
+  markNotificationAsReadApi,
+  markAllNotificationsAsReadApi,
+  clearAllNotificationsApi
+} from './api-client';
 
 export async function getNotifications(
-  // Potentially add pagination/filtering params later
-): Promise<{ notifications: NotificationMessage[]; total: number, unreadCount: number }> {
-  await delay(200); // Simulate network delay
-  const unread = dummyNotifications.filter(n => !n.read).length;
-  // Return notifications sorted by timestamp, newest first
-  const sortedNotifications = [...dummyNotifications].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  return { notifications: sortedNotifications, total: sortedNotifications.length, unreadCount: unread };
+  status?: 'unread' | 'all',
+  page?: number,
+  limit?: number
+): Promise<{ notifications: NotificationMessage[]; total: number; unreadCount: number }> {
+  const params = new URLSearchParams();
+  if (status) params.append('status', status);
+  if (page) params.append('page', String(page));
+  if (limit) params.append('limit', String(limit));
+
+  try {
+    const response = await getNotificationsApi(params);
+    return {
+      notifications: response.notifications,
+      total: response.total,
+      unreadCount: response.unreadCount,
+    };
+  } catch (error) {
+    console.error('Failed to fetch notifications:', error);
+    return { notifications: [], total: 0, unreadCount: 0 };
+  }
 }
 
-// Future functions like markAsRead, clearAll etc. could be added here
-// export async function markNotificationAsRead(id: string): Promise<boolean> { ... }
-// export async function markAllNotificationsAsRead(): Promise<boolean> { ... }
+export async function markNotificationAsRead(notificationId: string): Promise<NotificationMessage | null> {
+  try {
+    const response = await markNotificationAsReadApi(notificationId);
+    return response.notification;
+  } catch (error) {
+    console.error(`Failed to mark notification ${notificationId} as read:`, error);
+    return null;
+  }
+}
+
+export async function markAllNotificationsAsRead(): Promise<{ success: boolean; message: string; unreadCountAfter: number } | null> {
+  try {
+    return await markAllNotificationsAsReadApi();
+  } catch (error) {
+    console.error('Failed to mark all notifications as read:', error);
+    return null;
+  }
+}
+
+export async function clearAllNotifications(): Promise<{ success: boolean; message: string } | null> {
+  try {
+    return await clearAllNotificationsApi();
+  } catch (error) {
+    console.error('Failed to clear all notifications:', error);
+    return null;
+  }
+}

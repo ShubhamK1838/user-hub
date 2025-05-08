@@ -17,14 +17,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { createUser, updateUser } from "@/lib/users";
+import { createUser, updateUser } from "@/lib/users"; // These will use API client
 import type { User } from "@/lib/types";
 import { ALL_ROLES } from "@/lib/types";
-import { Label } from "@/components/ui/label";
-import { suggestUserRoles } from "@/ai/flows/suggest-user-roles";
+import { suggestUserRolesApi } from "@/lib/api-client"; // Use API client for AI suggestions
 import { useState } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
@@ -60,7 +58,7 @@ export function UserForm({ existingUser }: UserFormProps) {
       ? {
           ...existingUser,
           roles: existingUser.roles.split(',').map(r => r.trim()).filter(Boolean),
-          password: '', // Password should not be pre-filled
+          password: '', 
         }
       : {
           firstName: "",
@@ -88,9 +86,10 @@ export function UserForm({ existingUser }: UserFormProps) {
     }
     setIsSuggestingRoles(true);
     try {
-      const result = await suggestUserRoles({ jobTitle });
+      const result = await suggestUserRolesApi({ jobTitle });
       if (result.suggestedRoles && result.suggestedRoles.length > 0) {
-        const validSuggestedRoles = result.suggestedRoles.filter(role => ALL_ROLES.includes(role));
+        // const validSuggestedRoles = result.suggestedRoles.filter(role => ALL_ROLES.includes(role)); // Option: filter only known roles
+        const validSuggestedRoles = result.suggestedRoles; // Allow any string from AI for now
         const currentRoles = form.getValues("roles");
         const newRoles = Array.from(new Set([...currentRoles, ...validSuggestedRoles]));
         form.setValue("roles", newRoles, { shouldValidate: true });
@@ -101,15 +100,14 @@ export function UserForm({ existingUser }: UserFormProps) {
       } else {
         toast({
           title: "No Roles Suggested",
-          description: "AI could not suggest roles for this job title, or suggestions were not valid.",
+          description: "AI could not suggest roles for this job title.",
         });
       }
-    } catch (error) {
-      console.error("Error suggesting roles:", error);
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Suggestion Failed",
-        description: "Could not get role suggestions from AI.",
+        description: error.message || "Could not get role suggestions from AI.",
       });
     } finally {
       setIsSuggestingRoles(false);
@@ -119,36 +117,38 @@ export function UserForm({ existingUser }: UserFormProps) {
 
   async function onSubmit(values: UserFormValues) {
     setIsSubmitting(true);
-    const userData = {
+    const userDataForApi = {
       ...values,
-      roles: values.roles.join(','), // Convert array back to comma-separated string
+      roles: values.roles.join(','), 
     };
 
     try {
       if (existingUser) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { password, ...updateData } = userData; // Exclude password if not changed
-        const updatedUser = await updateUser(existingUser.id, password && password.length > 0 ? userData : updateData);
+        const { password, ...updateData } = userDataForApi; 
+        const dataToSend = values.password && values.password.length > 0 ? userDataForApi : updateData;
+        
+        const updatedUser = await updateUser(existingUser.id, dataToSend);
         if (updatedUser) {
           toast({ title: "Success", description: "User updated successfully." });
           router.push(`/users/${updatedUser.id}`);
           router.refresh();
         } else {
-          toast({ variant: "destructive", title: "Error", description: "Failed to update user." });
+          toast({ variant: "destructive", title: "Error", description: "Failed to update user. The user might not exist or an API error occurred." });
         }
       } else {
-        if (!userData.password || userData.password.length < 8) {
+        if (!userDataForApi.password || userDataForApi.password.length < 8) {
             form.setError("password", { type: "manual", message: "Password is required and must be at least 8 characters for new users." });
             setIsSubmitting(false);
             return;
         }
-        const newUser = await createUser(userData);
+        const newUser = await createUser(userDataForApi);
         toast({ title: "Success", description: "User created successfully." });
         router.push(`/users/${newUser.id}`);
         router.refresh();
       }
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
     } finally {
         setIsSubmitting(false);
     }
@@ -210,7 +210,7 @@ export function UserForm({ existingUser }: UserFormProps) {
                 <Input type="password" placeholder={existingUser ? "Leave blank to keep current password" : "Enter password"} {...field} />
               </FormControl>
               <FormDescription>
-                {existingUser ? "Leave blank if you don't want to change the password." : "Must be at least 8 characters."}
+                {existingUser ? "Leave blank if you don't want to change the password. Must be at least 8 characters if changing." : "Must be at least 8 characters."}
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -300,7 +300,7 @@ export function UserForm({ existingUser }: UserFormProps) {
         />
         
         <Separator />
-        <h3 className="text-lg font-medium">Account Status</h3>
+        <h3 className="text-lg font-medium">Account Status Settings (Admin Only)</h3>
         <div className="space-y-4">
             <FormField
             control={form.control}
@@ -330,7 +330,7 @@ export function UserForm({ existingUser }: UserFormProps) {
                 <div className="space-y-0.5">
                     <FormLabel className="text-base">Account Unlocked</FormLabel>
                     <FormDescription>
-                    If disabled, the account is locked (e.g. too many failed login attempts).
+                    If toggled off, the account is locked.
                     </FormDescription>
                 </div>
                 <FormControl>
@@ -350,7 +350,7 @@ export function UserForm({ existingUser }: UserFormProps) {
                 <div className="space-y-0.5">
                     <FormLabel className="text-base">Account Not Expired</FormLabel>
                     <FormDescription>
-                    If disabled, the account has expired.
+                    If toggled off, the account has expired.
                     </FormDescription>
                 </div>
                 <FormControl>
@@ -370,7 +370,7 @@ export function UserForm({ existingUser }: UserFormProps) {
                 <div className="space-y-0.5">
                     <FormLabel className="text-base">Credentials Not Expired</FormLabel>
                     <FormDescription>
-                    If disabled, the user's credentials (e.g. password) have expired.
+                    If toggled off, the user's credentials (e.g. password) have expired.
                     </FormDescription>
                 </div>
                 <FormControl>

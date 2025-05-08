@@ -16,12 +16,12 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { changePassword } from "@/lib/users";
+import { changePassword } from "@/lib/users"; // This will now use API client
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
 const passwordFormSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required."), // In a real app, this might be optional if admin is changing
+  currentPassword: z.string().min(1, "Current password is required."),
   newPassword: z.string().min(8, "New password must be at least 8 characters."),
   confirmPassword: z.string(),
 }).refine((data) => data.newPassword === data.confirmPassword, {
@@ -32,7 +32,7 @@ const passwordFormSchema = z.object({
 type PasswordFormValues = z.infer<typeof passwordFormSchema>;
 
 interface ChangePasswordFormProps {
-    userId: string;
+    userId: string; // userId might not be needed if API infers user from token
 }
 
 export function ChangePasswordForm({ userId }: ChangePasswordFormProps) {
@@ -51,8 +51,8 @@ export function ChangePasswordForm({ userId }: ChangePasswordFormProps) {
   async function onSubmit(values: PasswordFormValues) {
     setIsSubmitting(true);
     try {
-      // In a real app, currentPassword would be sent for verification.
-      // For this dummy service, we just pass it, but it's not used for verification in users.ts.
+      // Pass userId for clarity, though the backend API /api/auth/change-password
+      // should use the authenticated user's ID.
       const result = await changePassword(userId, values.currentPassword, values.newPassword);
       if (result.success) {
         toast({ title: "Success", description: result.message });
@@ -60,8 +60,8 @@ export function ChangePasswordForm({ userId }: ChangePasswordFormProps) {
       } else {
         toast({ variant: "destructive", title: "Error", description: result.message });
       }
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred while changing password." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred while changing password." });
     } finally {
         setIsSubmitting(false);
     }

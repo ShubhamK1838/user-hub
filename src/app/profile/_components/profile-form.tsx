@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { updateUser } from "@/lib/users";
+import { updateUser } from "@/lib/users"; // This will now use API client
 import type { User } from "@/lib/types";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -55,12 +55,12 @@ export function ProfileForm({ user }: ProfileFormProps) {
       const updatedUser = await updateUser(user.id, values);
       if (updatedUser) {
         toast({ title: "Success", description: "Profile updated successfully." });
-        router.refresh(); // Refresh to show updated data
+        router.refresh(); 
       } else {
-        toast({ variant: "destructive", title: "Error", description: "Failed to update profile." });
+        toast({ variant: "destructive", title: "Error", description: "Failed to update profile. The user might not exist or an API error occurred." });
       }
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred." });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
     } finally {
       setIsSubmitting(false);
     }

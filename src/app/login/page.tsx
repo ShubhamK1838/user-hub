@@ -1,11 +1,9 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { LogIn, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { AppLogoText } from '@/components/icons/logo';
@@ -14,14 +12,11 @@ import { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from '@/components/ui/checkbox';
 import { useRouter } from 'next/navigation';
-
-// export const metadata: Metadata = { title: 'Login' };
-// This won't work correctly with "use client" for the whole page for title.
-// Title should be set in a parent layout or via client-side document.title manipulation if dynamic.
-
+import { loginUserApi } from '@/lib/api-client';
+import { setAuthToken } from '@/lib/auth-token';
 
 const loginFormSchema = z.object({
   email: z.string().email("Invalid email address."),
@@ -36,7 +31,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => { // For dynamic title with "use client"
+  useEffect(() => {
     document.title = "Login | User Hub";
   }, []);
 
@@ -51,25 +46,24 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginFormValues) {
     setIsSubmitting(true);
-    // Simulate API call
-    console.log("Login attempt:", values);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Dummy login logic - replace with actual authentication
-    if (values.email === "admin@example.com" && values.password === "password") {
+    try {
+      const response = await loginUserApi(values);
+      setAuthToken(response.token);
       toast({
         title: "Login Successful!",
-        description: "Welcome back!",
+        description: `Welcome back, ${response.user.firstName}!`,
       });
-      router.push('/dashboard'); // Redirect to dashboard on successful login
-    } else {
+      router.push('/dashboard');
+      router.refresh(); // To re-fetch AppShell data with new auth state
+    } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
+        description: error.message || "Invalid email or password. Please try again.",
       });
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   }
 
   return (
@@ -105,9 +99,9 @@ export default function LoginPage() {
                   <FormItem>
                     <div className="flex items-center justify-between">
                         <FormLabel>Password</FormLabel>
-                        <Link href="/forgot-password" // Placeholder link
+                        <Link href="/forgot-password"
                             className="text-sm font-medium text-primary hover:underline"
-                            tabIndex={-1} // Make it focusable after password field if desired
+                            tabIndex={-1}
                         >
                             Forgot password?
                         </Link>

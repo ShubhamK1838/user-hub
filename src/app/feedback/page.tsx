@@ -1,26 +1,21 @@
 
-"use client"; // This page needs client components for form handling
+"use client"; 
 
-import type { Metadata } from 'next'; // Metadata can still be defined
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, Send, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
+import { submitFeedbackApi } from '@/lib/api-client';
 
-// Define metadata for server rendering if needed, though the page content is client-side.
-// export const metadata: Metadata = { title: 'Submit Feedback' }; 
-// This won't work correctly with "use client" for the whole page for title.
-// Title should be set in a parent layout or via client-side document.title manipulation if dynamic.
 
 const feedbackFormSchema = z.object({
   feedbackType: z.string().min(1, "Please select a feedback type."),
@@ -36,6 +31,10 @@ export default function FeedbackPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  useEffect(() => { 
+    document.title = "Submit Feedback | User Hub";
+  }, []);
+
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(feedbackFormSchema),
     defaultValues: {
@@ -48,23 +47,24 @@ export default function FeedbackPage() {
 
   async function onSubmit(values: FeedbackFormValues) {
     setIsSubmitting(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    console.log("Feedback submitted:", values);
-    toast({
-      title: "Feedback Submitted!",
-      description: "Thank you for your valuable feedback. We'll review it shortly.",
-    });
-    form.reset();
-    setIsSubmitting(false);
+    try {
+      const response = await submitFeedbackApi(values);
+      toast({
+        title: "Feedback Submitted!",
+        description: response.message || "Thank you for your valuable feedback. We'll review it shortly.",
+      });
+      form.reset();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: error.message || "Could not submit your feedback. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
   
-  // For dynamic title with "use client"
-  if (typeof document !== 'undefined') {
-    document.title = "Submit Feedback | User Hub";
-  }
-
-
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
        <Breadcrumbs

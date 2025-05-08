@@ -6,9 +6,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } // Import useState and useEffect
-from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import { updateNotificationPreferencesApi } from '@/lib/api-client'; // Import API client
 
 interface NotificationPreferences {
   systemAlerts: boolean;
@@ -20,19 +20,18 @@ interface NotificationPreferences {
 export function NotificationSettings() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
-  // Initialize state for preferences using useState
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     systemAlerts: true,
     newLogins: false,
     passwordChanges: true,
     roleUpdates: true,
   });
-  const [mounted, setMounted] = useState(false); // To avoid hydration mismatch
+  const [mounted, setMounted] = useState(false); 
 
   useEffect(() => {
     setMounted(true);
-    // In a real app, load preferences from user settings
-    // For now, we use the default state.
+    // TODO: In a real app, load preferences from user settings via API
+    // e.g. const loadedPrefs = await getNotificationPreferencesApi(); setPreferences(loadedPrefs);
   }, []);
 
   const handlePreferenceChange = (key: keyof NotificationPreferences, value: boolean) => {
@@ -41,17 +40,25 @@ export function NotificationSettings() {
 
   const handleSaveChanges = async () => {
     setIsSaving(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    // In a real app, save preferences to backend
-    toast({
-      title: "Preferences Saved",
-      description: "Your notification settings have been updated.",
-    });
-    setIsSaving(false);
+    try {
+      const response = await updateNotificationPreferencesApi(preferences);
+      toast({
+        title: "Preferences Saved",
+        description: response.message || "Your notification settings have been updated.",
+      });
+      // Optionally update local state if API returns new state: setPreferences(response.preferences);
+    } catch (error: any) {
+       toast({
+        variant: "destructive",
+        title: "Save Failed",
+        description: error.message || "Could not save your notification preferences.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  if (!mounted) { // Render nothing or a loader on the server to prevent hydration mismatch
+  if (!mounted) { 
     return (
         <Card>
             <CardHeader>
@@ -147,4 +154,3 @@ export function NotificationSettings() {
     </Card>
   );
 }
-

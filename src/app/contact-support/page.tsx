@@ -1,12 +1,10 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Contact, Send, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -16,10 +14,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
-
-// export const metadata: Metadata = { title: 'Contact Support' };
-// This won't work correctly with "use client" for the whole page for title.
-// Title should be set in a parent layout or via client-side document.title manipulation if dynamic.
+import { submitContactSupportApi } from '@/lib/api-client';
 
 
 const contactFormSchema = z.object({
@@ -28,7 +23,7 @@ const contactFormSchema = z.object({
   subject: z.string().min(5, "Subject must be at least 5 characters.").max(100),
   inquiryType: z.string().min(1, "Please select an inquiry type."),
   message: z.string().min(20, "Message must be at least 20 characters.").max(2000),
-  attachment: z.any().optional(), // Basic handling for potential file upload
+  attachment: z.custom<FileList>((val) => val instanceof FileList, "Attachment is required").optional(),
 });
 
 type ContactFormValues = z.infer<typeof contactFormSchema>;
@@ -37,9 +32,9 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 export default function ContactSupportPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null); // For attachment name
+  const [fileName, setFileName] = useState<string | null>(null);
   
-  useEffect(() => { // For dynamic title with "use client"
+  useEffect(() => { 
     document.title = "Contact Support | User Hub";
   }, []);
 
@@ -55,51 +50,55 @@ export default function ContactSupportPage() {
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // Basic validation (e.g., size, type) can be added here
+    const files = event.target.files;
+    if (files && files[0]) {
+      const file = files[0];
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({ variant: "destructive", title: "File Too Large", description: "Attachment cannot exceed 5MB." });
-        event.target.value = ""; // Clear the input
+        event.target.value = ""; 
         setFileName(null);
-        form.setValue("attachment", null);
+        form.setValue("attachment", undefined);
         return;
       }
       setFileName(file.name);
-      form.setValue("attachment", file);
+      form.setValue("attachment", files);
     } else {
       setFileName(null);
-      form.setValue("attachment", null);
+      form.setValue("attachment", undefined);
     }
   };
 
   async function onSubmit(values: ContactFormValues) {
     setIsSubmitting(true);
-    // Simulate API call with FormData for file upload
     const formData = new FormData();
-    Object.entries(values).forEach(([key, value]) => {
-      if (key === 'attachment' && value instanceof File) {
-        formData.append(key, value);
-      } else if (value !== undefined && value !== null) {
-        formData.append(key, String(value));
-      }
-    });
-
-    // console.log("Contact form data to send:", formData); // For debugging
-    for (let pair of formData.entries()) {
-        console.log(pair[0]+ ', ' + pair[1]); 
+    formData.append("name", values.name);
+    formData.append("email", values.email);
+    formData.append("subject", values.subject);
+    formData.append("inquiryType", values.inquiryType);
+    formData.append("message", values.message);
+    if (values.attachment && values.attachment[0]) {
+      formData.append("attachment", values.attachment[0]);
     }
 
-
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate network delay
-    
-    toast({
-      title: "Support Request Sent!",
-      description: "Thank you for contacting us. Our support team will get back to you soon.",
-    });
-    form.reset();
-    setFileName(null); // Reset file name display
-    setIsSubmitting(false);
+    try {
+      const response = await submitContactSupportApi(formData);
+      toast({
+        title: "Support Request Sent!",
+        description: response.message || "Thank you for contacting us. Our support team will get back to you soon.",
+      });
+      form.reset();
+      setFileName(null); 
+      const fileInput = document.getElementById('attachment-input') as HTMLInputElement | null;
+      if (fileInput) fileInput.value = '';
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: error.message || "Could not submit your support request. Please try again.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -212,11 +211,11 @@ export default function ContactSupportPage() {
               <FormField
                 control={form.control}
                 name="attachment"
-                render={({ field }) => ( // Destructure field but don't pass directly to Input type="file"
+                render={() => ( 
                   <FormItem>
                     <FormLabel>Attachment (Optional)</FormLabel>
                     <FormControl>
-                       <Input type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold hover:file:bg-primary/10" />
+                       <Input id="attachment-input" type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold hover:file:bg-primary/10" />
                     </FormControl>
                     {fileName && <FormDescription>Selected file: {fileName}</FormDescription>}
                      <FormDescription>Max file size: 5MB. Allowed types: PNG, JPG, PDF, TXT.</FormDescription>
