@@ -1,19 +1,17 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getUsers } from "@/lib/users";
+import { getUsersServer } from "@/lib/users-server";
 import { Users, UserCheck, UserX, ShieldAlert } from "lucide-react";
 import type { Metadata } from 'next';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ActivityLogChart } from "./_components/activity-log-chart";
-import { RolesDistributionChart } from "./_components/roles-distribution-chart";
+import { DashboardCharts } from "./_components/dashboard-charts";
 
 export const metadata: Metadata = {
   title: 'Dashboard',
 };
 
 export default async function DashboardPage() {
-  const { users: allUsers, total: totalUsers } = await getUsers(1, 1000); // Fetch all users for metrics
+  const { users: allUsers, total: totalUsers } = await getUsersServer(1, 1000); // Fetch all users for metrics
   
   const activeUsers = allUsers.filter(user => user.enabled).length;
   const disabledUsers = totalUsers - activeUsers;
@@ -79,24 +77,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <ActivityLogChart />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>User Roles Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-           <RolesDistributionChart users={allUsers} />
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardCharts users={allUsers} />
     </div>
   );
 }
